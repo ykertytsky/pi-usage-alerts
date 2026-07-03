@@ -1,0 +1,63 @@
+{
+  "name": "pi-usage-alerts",
+  "version": "0.1.0",
+  "description": "Threshold notifications for Pi subscription session limits on OpenAI Codex and Anthropic OAuth providers.",
+  "type": "module",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-coding-agent",
+    "usage-alerts",
+    "codex",
+    "anthropic",
+    "claude",
+    "openai",
+    "subscription",
+    "rate-limit"
+  ],
+  "license": "MIT",
+  "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "author": "Yaroslav Kertytsky <y.kertytsky@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ykertytsky/pi-usage-alerts.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ykertytsky/pi-usage-alerts/issues"
+  },
+  "homepage": "https://github.com/ykertytsky/pi-usage-alerts#readme",
+  "files": [
+    "extensions",
+    "src",
+    "assets",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ],
+    "image": "https://raw.githubusercontent.com/ykertytsky/pi-usage-alerts/main/assets/pi-usage-alerts-screenshot.png"
+  },
+  "scripts": {
+    "check": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-ai": "latest",
+    "@earendil-works/pi-coding-agent": "latest",
+    "@types/node": "latest",
+    "jiti": "^2.7.0",
+    "typescript": "latest"
+  }
+}
