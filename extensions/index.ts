@@ -2,6 +2,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
   cachedSnapshot,
   createAlertState,
+  currentThresholdAlert,
   evaluateThresholdAlerts,
   formatStatus,
   rateLimitAlert,
@@ -12,10 +13,11 @@ import {
 } from "../src/alerts.js";
 import { formatConfig, loadConfig } from "../src/config.js";
 import { notifyOS } from "../src/notify-os.js";
-import type { NotifySeverity, UsageSnapshot } from "../src/types.js";
+import type { AlertCandidate, NotifySeverity, UsageSnapshot } from "../src/types.js";
 import {
   activeUsageProvider,
   fetchUsageSnapshot,
+  formatResetDuration,
   formatUsageDetails,
   usageFamily,
 } from "../src/usage.js";
@@ -25,8 +27,11 @@ type PiContext = {
   model?: unknown;
   ui?: {
     notify?: (message: string, type?: NotifySeverity) => void | Promise<void>;
+    setStatus?: (key: string, text: string | undefined) => void;
   };
 };
+
+const ALERT_STATUS_KEY = "usage-alerts";
 
 type CheckOptions = {
   force?: boolean;
@@ -42,6 +47,22 @@ function notify(ctx: PiContext, message: string, severity: NotifySeverity = "inf
 
   const prefix = severity === "error" ? "error" : severity;
   console.log(`[usage-alerts:${prefix}] ${message}`);
+}
+
+function thresholdStatusText(alert: AlertCandidate): string {
+  const reset = formatResetDuration(alert.window.resetAt);
+  if (alert.tier === "exhausted") return `usage exhausted · resets ${reset}`;
+  return `usage ${alert.remainingPercent}% left · resets ${reset}`;
+}
+
+function setUsageStatus(ctx: PiContext, text: string): void {
+  if (!ctx.hasUI) return;
+  ctx.ui?.setStatus?.(ALERT_STATUS_KEY, text);
+}
+
+function clearPersistentAlert(ctx: PiContext): void {
+  if (!ctx.hasUI) return;
+  ctx.ui?.setStatus?.(ALERT_STATUS_KEY, undefined);
 }
 
 function currentProvider(ctx: PiContext): string | undefined {
@@ -84,6 +105,7 @@ async function checkAndAlert(
 ): Promise<UsageSnapshot | undefined> {
   const config = loadConfig();
   if (!config.enabled) {
+    clearPersistentAlert(ctx);
     if (options.announceStatus) notify(ctx, "Usage alerts are disabled.", "info");
     return undefined;
   }
@@ -91,12 +113,14 @@ async function checkAndAlert(
   const provider = currentProvider(ctx);
   resetProviderState(state, provider);
   if (!provider) {
+    clearPersistentAlert(ctx);
     if (options.notifyUnsupported) notify(ctx, "No active provider is selected.", "warning");
     return undefined;
   }
 
   const family = usageFamily(provider);
   if (!family) {
+    clearPersistentAlert(ctx);
     if (options.notifyUnsupported) {
       notify(
         ctx,
@@ -119,6 +143,13 @@ async function checkAndAlert(
   }
 
   if (!snapshot) return undefined;
+
+  const currentAlert = currentThresholdAlert(snapshot, config);
+  if (currentAlert) {
+    setUsageStatus(ctx, thresholdStatusText(currentAlert));
+  } else {
+    clearPersistentAlert(ctx);
+  }
 
   const alerts = evaluateThresholdAlerts(state, snapshot, config);
   for (const alert of alerts) {
@@ -149,6 +180,7 @@ function handleProviderResponse(
   const alert = rateLimitAlert(state, provider, status);
   if (!alert) return;
 
+  setUsageStatus(ctx, "usage rate-limited");
   notify(ctx, alert.message, "error");
   notifyOS("Pi usage alert", alert.message);
 }

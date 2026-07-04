@@ -91,6 +91,12 @@ function severityForTier(tier: AlertCandidate["tier"]): AlertCandidate["severity
   return tier === "warning" ? "warning" : "error";
 }
 
+function tierRank(tier: AlertCandidate["tier"]): number {
+  if (tier === "exhausted") return 3;
+  if (tier === "critical") return 2;
+  return 1;
+}
+
 function windowLabel(window: UsageWindow): string {
   return window.name === "5h" ? "5-hour" : "7-day";
 }
@@ -111,6 +117,46 @@ function thresholdMessage(
   return `${provider} ${windowLabel(window)} session limit is low: ${remaining}% left (${used}% used), resets in ${reset}.`;
 }
 
+function thresholdWindows(snapshot: UsageSnapshot, config: UsageAlertConfig): UsageWindow[] {
+  return [snapshot.primary, snapshot.secondary].filter(
+    (window): window is UsageWindow => !!window && config.windows.includes(window.name),
+  );
+}
+
+export function currentThresholdAlert(
+  snapshot: UsageSnapshot,
+  config: UsageAlertConfig,
+  now = Date.now(),
+): AlertCandidate | undefined {
+  let current: AlertCandidate | undefined;
+
+  for (const window of thresholdWindows(snapshot, config)) {
+    const remaining = remainingPercent(window);
+    const tier = thresholdTier(remaining, config);
+    if (!tier) continue;
+
+    const candidate: AlertCandidate = {
+      snapshot,
+      window,
+      tier,
+      severity: severityForTier(tier),
+      remainingPercent: remaining,
+      message: thresholdMessage(snapshot, window, tier, remaining, now),
+    };
+
+    if (
+      !current ||
+      tierRank(candidate.tier) > tierRank(current.tier) ||
+      (tierRank(candidate.tier) === tierRank(current.tier) &&
+        candidate.remainingPercent < current.remainingPercent)
+    ) {
+      current = candidate;
+    }
+  }
+
+  return current;
+}
+
 export function evaluateThresholdAlerts(
   state: AlertState,
   snapshot: UsageSnapshot,
@@ -118,11 +164,8 @@ export function evaluateThresholdAlerts(
   now = Date.now(),
 ): AlertCandidate[] {
   const alerts: AlertCandidate[] = [];
-  const windows = [snapshot.primary, snapshot.secondary].filter(
-    (window): window is UsageWindow => !!window && config.windows.includes(window.name),
-  );
 
-  for (const window of windows) {
+  for (const window of thresholdWindows(snapshot, config)) {
     const remaining = remainingPercent(window);
     const tier = thresholdTier(remaining, config);
     if (!tier) continue;

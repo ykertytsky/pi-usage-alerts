@@ -66,7 +66,7 @@ Authenticate with a supported subscription provider using Pi's normal login flow
 /login
 ```
 
-Then use Pi as usual. The extension checks usage at session start, after model changes, and after each turn. Alerts are deduplicated per provider, window, and threshold until that window resets.
+Then use Pi as usual. The extension checks usage at session start, after model changes, and after each turn. Alerts are deduplicated per provider, window, and threshold until that window resets. While a low-usage alert is active, a compact status segment (e.g. `usage 1% left · resets 57m`) stays visible in the status bar until the window recovers.
 
 ### Commands
 
@@ -97,6 +97,8 @@ Usage is fetched from each provider's own OAuth usage endpoint using Pi's stored
 Polling respects a minimum interval (5 minutes by default, 10 minutes minimum for Anthropic). A forced check via `/usage-alerts check` bypasses the interval.
 
 When the active provider returns HTTP 402, 403, or 429, the extension emits a rate-limit alert (deduplicated for 60 seconds).
+
+In Pi's TUI, alerts are sent through `ctx.ui.notify()` and the current active alert is mirrored into a compact status-bar segment (`usage <n>% left · resets <time>`, or `usage rate-limited`) via `ctx.ui.setStatus()`, so the key numbers stay visible during the session instead of only appearing as a transient notification.
 
 On first Anthropic usage fetch, the extension warns that subscription auth may draw from Claude extra usage billed per token.
 
