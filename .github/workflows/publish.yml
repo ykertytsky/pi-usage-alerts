@@ -17,6 +17,8 @@ jobs:
           node-version: 20
           cache: npm
           registry-url: https://registry.npmjs.org
+      # OIDC trusted publishing requires npm >= 11.5.1; Node 20 ships npm 10.x.
+      - run: npm install -g npm@latest
       - run: npm ci
       - run: npm run check
       - name: Verify release tag matches package.json version
@@ -26,6 +28,5 @@ jobs:
             echo "::error::Release tag ${GITHUB_REF_NAME} does not match package.json ($pkg_version)"
             exit 1
           fi
+      # Auth comes from the OIDC trusted publisher (id-token: write) — no NPM_TOKEN.
       - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
